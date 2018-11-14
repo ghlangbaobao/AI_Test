@@ -111,7 +111,7 @@ class DataSpeech():
 			n = n_start // bili * (bili - 1)
 			yushu = n_start % bili
 			length=len(self.list_wavnum_stcmds)
-			filename = os.path.join(self.dic_wavlist_stcmds[self.list_wavnum_stcmds[(n + yushu - 1)%length]])
+			filename = os.path.join(self.datapath_stcmds, self.dic_wavlist_stcmds[self.list_wavnum_stcmds[(n + yushu - 1)%length]])
 			list_symbol=self.dic_symbollist_stcmds[self.list_symbolnum_stcmds[(n + yushu - 1)%length]]
 		
 		if('Windows' == plat.system()):
