@@ -7,7 +7,14 @@ import platform as plat
 import os
 import time
 import logging
-logging.basicConfig(level=logging.DEBUG)
+
+log_file_name = os.path.join(os.path.dirname(__file__), "log.log")
+logging.basicConfig(level=logging.DEBUG, 
+				filename=log_file_name, 
+				format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S',
+                filemode='w')
+
 
 from general_function.file_wav import *
 from general_function.file_dict import *
@@ -210,6 +217,7 @@ class ModelSpeech(): # 语音模型类
 		'''
 		if filename is None:
 			filename = "last_trained"
+		self.logger.info("save model %s" % filename)
 		self._model.save_weights(os.path.join(self.model_trained_dir, "%s.model" % filename))
 		self.base_model.save_weights(os.path.join(self.model_trained_dir, "%s.model.base" % filename))
 		
@@ -224,6 +232,7 @@ class ModelSpeech(): # 语音模型类
 			为了减少测试时文件读写的io开销，可以通过调整这个参数来实现
 		
 		'''
+		self.logger.debug("test model")
 		data=DataSpeech(self.datapath_thchs30, self.datapath_stcmds, str_dataset)
 		#data.LoadDataList(str_dataset) 
 		num_data = data.GetDataNum() # 获取数据的数量

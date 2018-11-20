@@ -3,6 +3,7 @@
 
 import platform as plat
 import os
+import logging
 
 import numpy as np
 from general_function.file_wav import *
@@ -23,7 +24,7 @@ class DataSpeech():
 		'''
 		
 # 		system_type = plat.system() # 由于不同的系统的文件路径表示不一样，需要进行判断
-		
+		self.logger = logging.getLogger(self.__class__.__name__)
 		self.data_list_path = os.path.join(os.path.dirname(__file__), "datalist")
 		
 		self.datapath_thchs30 = path_thchs30; # 数据存放位置根目录
@@ -48,7 +49,6 @@ class DataSpeech():
 		self.wavs_data = []
 		self.LoadToMem = LoadToMem
 		self.MemWavCount = MemWavCount
-		pass
 	
 	def LoadDataList(self):
 		'''
@@ -104,7 +104,8 @@ class DataSpeech():
 			bili = 11
 			
 		# 读取一个文件
-		if(n_start % bili == 0):
+# 		if(n_start % bili == 0):
+		if(n_start % bili != 20):
 			filename = os.path.join(self.datapath_thchs30, self.dic_wavlist_thchs30[self.list_wavnum_thchs30[n_start // bili]])
 			list_symbol=self.dic_symbollist_thchs30[self.list_symbolnum_thchs30[n_start // bili]]
 		else:
@@ -117,6 +118,7 @@ class DataSpeech():
 		if('Windows' == plat.system()):
 			filename = filename.replace('/','\\') # windows系统下需要执行这一行，对文件路径做特别处理
 		# print filename
+		self.logger.debug("get wave data from %s" % filename)
 		wavsignal,fs=read_wav_data(filename)
 		
 		# 获取输出特征
@@ -178,9 +180,10 @@ class DataSpeech():
 				data_input, data_labels = self.GetData(ran_num)  # 通过随机数取一个数据
 				#data_input, data_labels = self.GetData((ran_num + i) % self.DataNum)  # 从随机数开始连续向后取一定数量数据
 				
+				self.logger.debug("data_input shape: %s" % str(data_input.shape))
 				input_length.append(data_input.shape[0] // 8 + data_input.shape[0] % 8)
 				#print(data_input, data_labels)
-				#print('data_input长度:',len(data_input))
+				self.logger.debug('data_input length: %s' % len(data_input))
 				
 				X[i,0:len(data_input)] = data_input
 				#print('data_labels长度:',len(data_labels))
@@ -197,8 +200,8 @@ class DataSpeech():
 			#print('input_length:\n',input_length)
 			#X=X.reshape(batch_size, audio_length, 200, 1)
 			#print(X)
+			self.logger.debug("yield wave data, input_length: %s, label_length: %s" % (input_length, label_length))
 			yield [X, y, input_length, label_length ], labels
-		pass
 		
 	def GetSymbolList(self):
 		'''

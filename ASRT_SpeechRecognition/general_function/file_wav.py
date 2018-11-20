@@ -199,11 +199,11 @@ def get_wav_symbol(filename):
 	返回一个存储符号集的字典类型值
 	'''
 	txt_obj=open(filename,'r') # 打开文件并读入
-	txt_text=txt_obj.read()
-	txt_lines=txt_text.split('\n') # 文本分割
+	txt_lines=txt_obj.readlines()
 	dic_symbol_list={} # 初始化字典
 	list_symbolmark=[] # 初始化symbol列表
 	for i in txt_lines:
+		i = i.strip()
 		if(i!=''):
 			txt_l=i.split(' ')
 			dic_symbol_list[txt_l[0]]=txt_l[1:]
