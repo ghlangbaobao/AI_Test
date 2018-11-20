@@ -7,13 +7,14 @@ import logging
 
 import numpy as np
 from general_function.file_wav import *
-from general_function.file_dict import *
 
 import random
 #import scipy.io.wavfile as wav
 from scipy.fftpack import fft
 
-class DataSpeech():
+__version__ = "1.0.0"
+
+class DataSpeech(object):
 	
 	
 	def __init__(self, path_thchs30, path_stcmds, type, LoadToMem = False, MemWavCount = 10000):
@@ -39,7 +40,9 @@ class DataSpeech():
 		self.dic_symbollist_stcmds = {}
 		
 		self.SymbolNum = 0 # 记录拼音符号数量
-		self.list_symbol = self.GetSymbolList() # 全部汉语拼音符号列表
+		self.list_symbol = DataSpeech.GetSymbolList() # 全部汉语拼音符号列表
+		self.SymbolNum = len(self.list_symbol)
+		
 		self.list_wavnum=[] # wav文件标记列表
 		self.list_symbolnum=[] # symbol标记列表
 		
@@ -202,8 +205,9 @@ class DataSpeech():
 			#print(X)
 			self.logger.debug("yield wave data, input_length: %s, label_length: %s" % (input_length, label_length))
 			yield [X, y, input_length, label_length ], labels
-		
-	def GetSymbolList(self):
+	
+	@staticmethod
+	def GetSymbolList():
 		'''
 		加载拼音符号列表，用于标记符号
 		返回一个列表list类型变量
@@ -220,7 +224,6 @@ class DataSpeech():
 				list_symbol.append(txt_l[0])
 		txt_obj.close()
 		list_symbol.append('_')
-		self.SymbolNum = len(list_symbol)
 		return list_symbol
 
 	def GetSymbolNum(self):

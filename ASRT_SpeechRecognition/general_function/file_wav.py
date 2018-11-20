@@ -16,6 +16,8 @@ from python_speech_features import logfbank
 
 from scipy.fftpack import fft
 
+__version__ = "1.0.0"
+
 def read_wav_data(filename):
 	'''
 	读取一个wav文件，返回声音信号的时域谱矩阵和播放时间

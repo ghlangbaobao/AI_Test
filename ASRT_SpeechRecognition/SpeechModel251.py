@@ -7,6 +7,7 @@ import platform as plat
 import os
 import time
 import logging
+from scipy.optimize.minpack import _general_function
 
 log_file_name = os.path.join(os.path.dirname(__file__), "log.log")
 logging.basicConfig(level=logging.DEBUG, 
@@ -15,7 +16,7 @@ logging.basicConfig(level=logging.DEBUG,
                 datefmt='%Y-%m-%d %H:%M:%S',
                 filemode='w')
 
-
+from general_function import file_wav
 from general_function.file_wav import *
 from general_function.file_dict import *
 from general_function.gen_func import *
@@ -31,19 +32,23 @@ from keras.layers import Lambda, TimeDistributed, Activation,Conv2D, MaxPooling2
 from keras import backend as K
 from keras.optimizers import SGD, Adadelta, Adam
 
+import readdata24
 from readdata24 import DataSpeech
 
 abspath = ''
 ModelName='251'
 #NUM_GPU = 2
 
-class ModelSpeech(): # 语音模型类
+__version__ = "SpeechModel 1.0.0, readdata %s, file_wave %s" % (readdata24.__version__, file_wav.__version__)
+
+class ModelSpeech(object): # 语音模型类
 	def __init__(self, datapath_thchs30, datapath_stcmds):
 		'''
 		初始化
 		默认输出的拼音的表示大小是1422，即1421个拼音+1个空白块
 		'''
 		self.logger = logging.getLogger(self.__class__.__name__)
+		self.logger.info("version info: %s" % __version__)
 		MS_OUTPUT_SIZE = 1422
 		self.MS_OUTPUT_SIZE = MS_OUTPUT_SIZE # 神经网络最终输出的每一个字符向量维度的大小
 		#self.BATCH_SIZE = BATCH_SIZE # 一次训练的batch
@@ -379,7 +384,7 @@ class ModelSpeech(): # 语音模型类
 		r1 = self.Predict(data_input, input_length)
 		#t3=time.time()
 		#print('time cost:',t3-t2)
-		list_symbol_dic = GetSymbolList(self.datapath) # 获取拼音列表
+		list_symbol_dic = DataSpeech.GetSymbolList() # 获取拼音列表
 		
 		
 		r_str=[]
