@@ -104,8 +104,8 @@ class DataSpeech():
 			bili = 11
 			
 		# 读取一个文件
-# 		if(n_start % bili == 0):
-		if(n_start % bili != 20):
+		if(n_start % bili == 0):
+# 		if(n_start % bili != 20):
 			filename = os.path.join(self.datapath_thchs30, self.dic_wavlist_thchs30[self.list_wavnum_thchs30[n_start // bili]])
 			list_symbol=self.dic_symbollist_thchs30[self.list_symbolnum_thchs30[n_start // bili]]
 		else:
