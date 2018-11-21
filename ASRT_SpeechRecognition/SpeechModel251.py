@@ -7,7 +7,6 @@ import platform as plat
 import os
 import time
 import logging
-from scipy.optimize.minpack import _general_function
 
 log_file_name = os.path.join(os.path.dirname(__file__), "log.log")
 logging.basicConfig(level=logging.DEBUG, 
