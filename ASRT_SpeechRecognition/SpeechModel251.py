@@ -60,6 +60,9 @@ class ModelSpeech(object): # 语音模型类
 		self.datapath_stcmds = datapath_stcmds
 		
 		self.model_trained_dir = os.path.join(os.path.dirname(__file__), "model_trained")
+		if os.path.exists("/content/drive/AI_Test"):
+			self.model_trained_dir = os.path.join("/content/drive/AI_Test/model_trained")
+			
 		if not os.path.exists(self.model_trained_dir):
 			os.mkdir(self.model_trained_dir)
 		
