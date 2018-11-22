@@ -164,7 +164,7 @@ class ModelSpeech(object): # 语音模型类
 	
 	
 	
-	def TrainModel(self, epoch = 2, save_step = 1000, batch_size = 32):
+	def TrainModel(self, epoch = 2, save_step = 1000, batch_size = 32, start_nstep=0):
 		'''
 		训练模型
 		参数：
@@ -182,7 +182,7 @@ class ModelSpeech(object): # 语音模型类
 		for epoch in range(epoch): # 迭代轮数
 			self.logger.debug("train epoch %s." % epoch)
 # 			print('[running] train epoch %d .' % epoch)
-			n_step = 0 # 迭代数据数
+			n_step = start_nstep # 迭代数据数
 			while True:
 				try:
 					self.logger.debug('epoch %d . Have train datas %d+'%(epoch, n_step*save_step))
