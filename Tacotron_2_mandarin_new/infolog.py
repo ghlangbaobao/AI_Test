@@ -5,8 +5,11 @@ import atexit
 import json
 from datetime import datetime
 from threading import Thread
-# from urllib.request import Request, urlopen
-from urllib2 import Request, urlopen
+import platform
+if platform.python_version().startswith("3"):
+	from urllib.request import Request, urlopen
+else:
+	from urllib2 import Request, urlopen
 
 _format = '%Y-%m-%d %H:%M:%S.%f'
 _file = None

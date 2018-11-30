@@ -15,16 +15,18 @@ from wavenet_vocoder.train import wavenet_train
 
 log = infolog.log
 
-origin_mkdir = os.makedirs
-
-def os_makedirs(path, *args, **kargs):
+if platform.python_version().startswith("2"):
 	
-	if os.path.exists(path):
-		return
-	else:
-		origin_mkdir(path)
+	origin_mkdir = os.makedirs
+	
+	def os_makedirs(path, *args, **kargs):
 		
-os.makedirs = os_makedirs
+		if os.path.exists(path):
+			return
+		else:
+			origin_mkdir(path)
+			
+	os.makedirs = os_makedirs
 
 def save_seq(file, sequence, input_path):
 	'''Save Tacotron-2 training state to disk. (To skip for future runs)
