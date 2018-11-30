@@ -15,6 +15,16 @@ from wavenet_vocoder.train import wavenet_train
 
 log = infolog.log
 
+origin_mkdir = os.makedirs
+
+def os_makedirs(path, *args, **kargs):
+	
+	if os.path.exists(path):
+		return
+	else:
+		origin_mkdir(path)
+		
+os.makedirs = os_makedirs
 
 def save_seq(file, sequence, input_path):
 	'''Save Tacotron-2 training state to disk. (To skip for future runs)
@@ -126,7 +136,11 @@ def main():
 		raise ValueError('please enter a valid model to train: {}'.format(accepted_models))
 
 	log_dir, hparams = prepare_run(args)
-
+	
+	if os.path.exists("/content/drive/AI_Test"):
+		log_dir = os.path.join("/content/drive/AI_Test/log-%s" % args.model)
+		os.makedirs(log_dir, exist_ok=True)
+	
 	if args.model == 'Tacotron':
 		tacotron_train(args, log_dir, hparams)
 	elif args.model == 'WaveNet':
