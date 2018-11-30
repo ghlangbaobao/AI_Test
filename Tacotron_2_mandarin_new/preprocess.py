@@ -51,6 +51,7 @@ def norm_data(args):
 	if args.dataset.startswith('THCHS-30'):
 		if os.path.exists("/content/drive/AI_Test"):
 			path = os.path.join("/content", 'data_thchs30')
+			print(path)
 			return [path]
 		else:
 			return [os.path.join(args.base_dir, 'data_thchs30')]
