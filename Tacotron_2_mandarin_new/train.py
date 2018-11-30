@@ -15,6 +15,7 @@ from wavenet_vocoder.train import wavenet_train
 
 log = infolog.log
 
+import platform
 if platform.python_version().startswith("2"):
 	
 	origin_mkdir = os.makedirs
