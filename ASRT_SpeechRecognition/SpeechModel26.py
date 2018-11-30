@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 @author: nl8590687
@@ -6,16 +6,7 @@
 import platform as plat
 import os
 import time
-import logging
 
-log_file_name = os.path.join(os.path.dirname(__file__), "log.log")
-logging.basicConfig(level=logging.DEBUG, 
-				filename=log_file_name, 
-				format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S',
-                filemode='w')
-
-from general_function import file_wav
 from general_function.file_wav import *
 from general_function.file_dict import *
 from general_function.gen_func import *
@@ -26,28 +17,20 @@ import numpy as np
 import random
 
 from keras.models import Sequential, Model
-from keras.layers import Dense, Dropout, Input, Reshape, BatchNormalization # , Flatten
-from keras.layers import Lambda, TimeDistributed, Activation,Conv2D, MaxPooling2D #, Merge
+from keras.layers import Dense, Dropout, Input, Reshape,GRU # , Flatten,LSTM,Convolution1D,MaxPooling1D,Merge
+from keras.layers import Conv1D,LSTM,MaxPooling1D, Lambda, TimeDistributed, Activation,Conv2D, MaxPooling2D #, Merge,Conv1D
+from keras.layers.merge import add, concatenate
 from keras import backend as K
-from keras.optimizers import SGD, Adadelta, Adam
+from keras.optimizers import SGD, Adadelta
 
-import readdata24
 from readdata24 import DataSpeech
 
-abspath = ''
-ModelName='251'
-#NUM_GPU = 2
-
-__version__ = "SpeechModel 1.0.0, readdata %s, file_wave %s" % (readdata24.__version__, file_wav.__version__)
-
-class ModelSpeech(object): # 语音模型类
-	def __init__(self, datapath_thchs30, datapath_stcmds):
+class ModelSpeech(): # 语音模型类
+	def __init__(self, datapath):
 		'''
 		初始化
 		默认输出的拼音的表示大小是1422，即1421个拼音+1个空白块
 		'''
-		self.logger = logging.getLogger(self.__class__.__name__)
-		self.logger.info("version info: %s" % __version__)
 		MS_OUTPUT_SIZE = 1422
 		self.MS_OUTPUT_SIZE = MS_OUTPUT_SIZE # 神经网络最终输出的每一个字符向量维度的大小
 		#self.BATCH_SIZE = BATCH_SIZE # 一次训练的batch
@@ -56,71 +39,87 @@ class ModelSpeech(object): # 语音模型类
 		self.AUDIO_FEATURE_LENGTH = 200
 		self._model, self.base_model = self.CreateModel() 
 		
-		self.datapath_thchs30 = datapath_thchs30
-		self.datapath_stcmds = datapath_stcmds
-		
-		self.model_trained_dir = os.path.join(os.path.dirname(__file__), "model_trained")
-		if os.path.exists("/content/drive/AI_Test"):
-			self.model_trained_dir = os.path.join("/content/drive/AI_Test/model_trained")
-			
-		if not os.path.exists(self.model_trained_dir):
-			os.mkdir(self.model_trained_dir)
-		
+		self.datapath = datapath
+		self.slash = ''
+		system_type = plat.system() # 由于不同的系统的文件路径表示不一样，需要进行判断
+		if(system_type == 'Windows'):
+			self.slash='\\' # 反斜杠
+		elif(system_type == 'Linux'):
+			self.slash='/' # 正斜杠
+		else:
+			print('*[Message] Unknown System\n')
+			self.slash='/' # 正斜杠
+		if(self.slash != self.datapath[-1]): # 在目录路径末尾增加斜杠
+			self.datapath = self.datapath + self.slash
+	
 		
 	def CreateModel(self):
 		'''
 		定义CNN/LSTM/CTC模型，使用函数式模型
-		输入层：200维的特征值序列，一条语音数据的最大长度设为1600（大约16s）
-		隐藏层：卷积池化层，卷积核大小为3x3，池化窗口大小为2
-		隐藏层：全连接层
-		输出层：全连接层，神经元数量为self.MS_OUTPUT_SIZE，使用softmax作为激活函数，
-		CTC层：使用CTC的loss作为损失函数，实现连接性时序多输出
+		输入层：39维的特征值序列，一条语音数据的最大长度设为1500（大约15s）
+		隐藏层一：1024个神经元的卷积层
+		隐藏层二：池化层，池化窗口大小为2
+		隐藏层三：Dropout层，需要断开的神经元的比例为0.2，防止过拟合
+		隐藏层四：循环层、LSTM层
+		隐藏层五：Dropout层，需要断开的神经元的比例为0.2，防止过拟合
+		隐藏层六：全连接层，神经元数量为self.MS_OUTPUT_SIZE，使用softmax作为激活函数，
+		输出层：自定义层，即CTC层，使用CTC的loss作为损失函数，实现连接性时序多输出
 		
 		'''
-		
+		# 每一帧使用13维mfcc特征及其13维一阶差分和13维二阶差分表示，最大信号序列长度为1500
 		input_data = Input(name='the_input', shape=(self.AUDIO_LENGTH, self.AUDIO_FEATURE_LENGTH, 1))
 		
-		layer_h1 = Conv2D(32, (3,3), use_bias=False, activation='relu', padding='same', kernel_initializer='he_normal')(input_data) # 卷积层
-		layer_h1 = Dropout(0.05)(layer_h1)
+		layer_h1 = Conv2D(32, (3,3), use_bias=True, activation='relu', padding='same', kernel_initializer='he_normal')(input_data) # 卷积层
+		layer_h1 = Dropout(0.1)(layer_h1)
 		layer_h2 = Conv2D(32, (3,3), use_bias=True, activation='relu', padding='same', kernel_initializer='he_normal')(layer_h1) # 卷积层
 		layer_h3 = MaxPooling2D(pool_size=2, strides=None, padding="valid")(layer_h2) # 池化层
 		#layer_h3 = Dropout(0.2)(layer_h2) # 随机中断部分神经网络连接，防止过拟合
-		layer_h3 = Dropout(0.05)(layer_h3)
+		layer_h3 = Dropout(0.2)(layer_h3)
 		layer_h4 = Conv2D(64, (3,3), use_bias=True, activation='relu', padding='same', kernel_initializer='he_normal')(layer_h3) # 卷积层
-		layer_h4 = Dropout(0.1)(layer_h4)
+		layer_h4 = Dropout(0.2)(layer_h4)
 		layer_h5 = Conv2D(64, (3,3), use_bias=True, activation='relu', padding='same', kernel_initializer='he_normal')(layer_h4) # 卷积层
 		layer_h6 = MaxPooling2D(pool_size=2, strides=None, padding="valid")(layer_h5) # 池化层
 		
-		layer_h6 = Dropout(0.1)(layer_h6)
+		layer_h6 = Dropout(0.3)(layer_h6)
 		layer_h7 = Conv2D(128, (3,3), use_bias=True, activation='relu', padding='same', kernel_initializer='he_normal')(layer_h6) # 卷积层
-		layer_h7 = Dropout(0.15)(layer_h7)
+		layer_h7 = Dropout(0.3)(layer_h7)
 		layer_h8 = Conv2D(128, (3,3), use_bias=True, activation='relu', padding='same', kernel_initializer='he_normal')(layer_h7) # 卷积层
 		layer_h9 = MaxPooling2D(pool_size=2, strides=None, padding="valid")(layer_h8) # 池化层
 		
-		layer_h9 = Dropout(0.15)(layer_h9)
+		layer_h9 = Dropout(0.3)(layer_h9)
 		layer_h10 = Conv2D(128, (3,3), use_bias=True, activation='relu', padding='same', kernel_initializer='he_normal')(layer_h9) # 卷积层
-		layer_h10 = Dropout(0.2)(layer_h10)
+		layer_h10 = Dropout(0.4)(layer_h10)
 		layer_h11 = Conv2D(128, (3,3), use_bias=True, activation='relu', padding='same', kernel_initializer='he_normal')(layer_h10) # 卷积层
 		layer_h12 = MaxPooling2D(pool_size=1, strides=None, padding="valid")(layer_h11) # 池化层
 		
-		layer_h12 = Dropout(0.2)(layer_h12)
-		layer_h13 = Conv2D(128, (3,3), use_bias=True, activation='relu', padding='same', kernel_initializer='he_normal')(layer_h12) # 卷积层
-		layer_h13 = Dropout(0.2)(layer_h13)
-		layer_h14 = Conv2D(128, (3,3), use_bias=True, activation='relu', padding='same', kernel_initializer='he_normal')(layer_h13) # 卷积层
-		layer_h15 = MaxPooling2D(pool_size=1, strides=None, padding="valid")(layer_h14) # 池化层
-		
-		#test=Model(inputs = input_data, outputs = layer_h12)
+		#test=Model(inputs = input_data, outputs = layer_h6)
 		#test.summary()
 		
-		layer_h16 = Reshape((200, 3200))(layer_h15) #Reshape层
-		#layer_h5 = LSTM(256, activation='relu', use_bias=True, return_sequences=True)(layer_h4) # LSTM层
-		#layer_h6 = Dropout(0.2)(layer_h5) # 随机中断部分神经网络连接，防止过拟合
-		layer_h16 = Dropout(0.3)(layer_h16)
-		layer_h17 = Dense(128, activation="relu", use_bias=True, kernel_initializer='he_normal')(layer_h16) # 全连接层
-		layer_h17 = Dropout(0.3)(layer_h17)
-		layer_h18 = Dense(self.MS_OUTPUT_SIZE, use_bias=True, kernel_initializer='he_normal')(layer_h17) # 全连接层
+		layer_h13 = Reshape((200, 3200))(layer_h12) #Reshape层
 		
-		y_pred = Activation('softmax', name='Activation0')(layer_h18)
+		layer_h13 = Dropout(0.4)(layer_h13)
+		layer_h14 = Dense(128, activation="relu", use_bias=True, kernel_initializer='he_normal')(layer_h13) # 全连接层
+		layer_h14 = Dropout(0.4)(layer_h14)
+		inner = layer_h14
+		#layer_h5 = LSTM(256, activation='relu', use_bias=True, return_sequences=True)(layer_h4) # LSTM层
+		
+		rnn_size=128
+		gru_1 = GRU(rnn_size, return_sequences=True, kernel_initializer='he_normal', name='gru1')(inner)
+		gru_1b = GRU(rnn_size, return_sequences=True, go_backwards=True, kernel_initializer='he_normal', name='gru1_b')(inner)
+		gru1_merged = add([gru_1, gru_1b])
+		gru_2 = GRU(rnn_size, return_sequences=True, kernel_initializer='he_normal', name='gru2')(gru1_merged)
+		gru_2b = GRU(rnn_size, return_sequences=True, go_backwards=True, kernel_initializer='he_normal', name='gru2_b')(gru1_merged)
+		
+		gru2 = concatenate([gru_2, gru_2b])
+		#layer_h12 = GRU(128,activation='tanh', recurrent_activation='hard_sigmoid', use_bias=True, kernel_initializer='he_normal', recurrent_initializer='orthogonal', bias_initializer='zeros', return_sequences=True)(layer_h11)
+		
+		layer_h15 = Dropout(0.4)(gru2)
+		layer_h16 = Dense(128, activation="relu", use_bias=True, kernel_initializer='he_normal')(layer_h15) # 全连接层
+		
+		layer_h16 = Dropout(0.5)(layer_h16) # 随机中断部分神经网络连接，防止过拟合
+		layer_h17 = Dense(self.MS_OUTPUT_SIZE, use_bias=True, kernel_initializer='he_normal')(layer_h16) # 全连接层
+		
+		y_pred = Activation('softmax', name='Activation0')(layer_h17)
 		model_data = Model(inputs = input_data, outputs = y_pred)
 		#model_data.summary()
 		
@@ -141,18 +140,16 @@ class ModelSpeech(object): # 语音模型类
 		
 		# clipnorm seems to speeds up convergence
 		#sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
-		#opt = Adadelta(lr = 0.01, rho = 0.95, epsilon = 1e-06)
-		opt = Adam(lr = 0.001, beta_1 = 0.9, beta_2 = 0.999, decay = 0.0, epsilon = 10e-8)
+		ada_d = Adadelta(lr = 0.01, rho = 0.95, epsilon = 1e-06)
+		
 		#model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=sgd)
-		model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer = opt)
+		model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer = ada_d)
 		
 		
 		# captures output of softmax so we can decode the output during visualization
 		test_func = K.function([input_data], [y_pred])
 		
-		#print('[*提示] 创建模型成功，模型编译成功')
-		self.logger.info("Create Model Successful, Compiles Model Successful. ")
-# 		print('[*Info] Create Model Successful, Compiles Model Successful. ')
+		print('[*提示] 创建模型成功，模型编译成功')
 		return model, model_data
 		
 	def ctc_lambda_func(self, args):
@@ -164,7 +161,7 @@ class ModelSpeech(object): # 语音模型类
 	
 	
 	
-	def TrainModel(self, epoch = 2, save_step = 1000, batch_size = 32, start_nstep=0):
+	def TrainModel(self, datapath, epoch = 2, save_step = 1000, batch_size = 32, filename = 'model_speech/m26/speech_model26'):
 		'''
 		训练模型
 		参数：
@@ -173,74 +170,53 @@ class ModelSpeech(object): # 语音模型类
 			save_step: 每多少步保存一次模型
 			filename: 默认保存文件名，不含文件后缀名
 		'''
-		data=DataSpeech(self.datapath_thchs30, self.datapath_stcmds, 'train')
+		data=DataSpeech(datapath, 'train')
 		
 		num_data = data.GetDataNum() # 获取数据的数量
 		
 		yielddatas = data.data_genetator(batch_size, self.AUDIO_LENGTH)
 		
 		for epoch in range(epoch): # 迭代轮数
-			self.logger.debug("train epoch %s." % epoch)
-# 			print('[running] train epoch %d .' % epoch)
-			n_step = start_nstep # 迭代数据数
+			print('[running] train epoch %d .' % epoch)
+			n_step = 0 # 迭代数据数
 			while True:
 				try:
-					self.logger.debug('epoch %d . Have train datas %d+'%(epoch, n_step*save_step))
-# 					print('[message] epoch %d . Have train datas %d+'%(epoch, n_step*save_step))
+					print('[message] epoch %d . Have train datas %d+'%(epoch, n_step*save_step))
 					# data_genetator是一个生成器函数
 					
 					#self._model.fit_generator(yielddatas, save_step, nb_worker=2)
 					self._model.fit_generator(yielddatas, save_step)
 					n_step += 1
 				except StopIteration:
-					self.logger.error("generator error. please check data format.")
-# 					print('[error] generator error. please check data format.')
+					print('[error] generator error. please check data format.')
 					break
 				
-				self.SaveModel(filename='speech_model_%s_e_%s_step_%s'% (ModelName, epoch, n_step * save_step))
-				self.TestModel(str_dataset='train', data_count = 4)
-				self.TestModel(str_dataset='dev', data_count = 4)
+				self.SaveModel(comment='_e_'+str(epoch)+'_step_'+str(n_step * save_step))
+				self.TestModel(self.datapath, str_dataset='train', data_count = 4)
+				self.TestModel(self.datapath, str_dataset='dev', data_count = 4)
 				
-	def LoadModel(self,filename=None):
+	def LoadModel(self,filename='model_speech/m26/speech_model26.model'):
 		'''
 		加载模型参数
 		'''
-		if filename is None:
-			filename = "last_trained"
-			
-		model_filename = "%s.model" % filename
-		base_model_filename = "%s.model.base" % filename
-		if not os.path.exists(model_filename):
-			model_filename = os.path.join(self.model_trained_dir, model_filename)
-			base_model_filename = os.path.join(self.model_trained_dir, base_model_filename)
-		if not os.path.exists(model_filename):
-			raise RuntimeError("model path %s not exists.")
-		self._model.load_weights(model_filename)
-		self.base_model.load_weights(base_model_filename)
+		self._model.load_weights(filename)
+		self.base_model.load_weights(filename + '.base')
 
-	def SaveModel(self,filename=None):
+	def SaveModel(self,filename='model_speech/m26/speech_model26',comment=''):
 		'''
 		保存模型参数
 		'''
-		if filename is None:
-			filename = "last_trained"
-		self.logger.info("save model %s" % filename)
-		self._model.save_weights(os.path.join(self.model_trained_dir, "%s.model" % filename))
-		self.base_model.save_weights(os.path.join(self.model_trained_dir, "%s.model.base" % filename))
-		
-	def TestModel(self, str_dataset='dev', data_count = 32, out_report = False, show_ratio = True):
+		self._model.save_weights(filename+comment+'.model')
+		self.base_model.save_weights(filename + comment + '.model.base')
+		f = open('step26.txt','w')
+		f.write(filename+comment)
+		f.close()
+
+	def TestModel(self, datapath='', str_dataset='dev', data_count = 32, out_report = False, show_ratio = True):
 		'''
 		测试检验模型效果
-		
-		io_step_print
-			为了减少测试时标准输出的io开销，可以通过调整这个参数来实现
-		
-		io_step_file
-			为了减少测试时文件读写的io开销，可以通过调整这个参数来实现
-		
 		'''
-		self.logger.debug("test model")
-		data=DataSpeech(self.datapath_thchs30, self.datapath_stcmds, str_dataset)
+		data=DataSpeech(self.datapath, str_dataset)
 		#data.LoadDataList(str_dataset) 
 		num_data = data.GetDataNum() # 获取数据的数量
 		if(data_count <= 0 or data_count > num_data): # 当data_count为小于等于0或者大于测试数据量的值时，则使用全部数据来测试
@@ -256,7 +232,7 @@ class ModelSpeech(object): # 语音模型类
 			if(out_report == True):
 				txt_obj = open('Test_Report_' + str_dataset + '_' + nowtime + '.txt', 'w', encoding='UTF-8') # 打开文件并读入
 			
-			txt = '测试报告\n模型编号 ' + ModelName + '\n\n'
+			txt = ''
 			for i in range(data_count):
 				data_input, data_labels = data.GetData((ran_num + i) % num_data)  # 从随机数开始连续向后取一定数量数据
 				
@@ -264,8 +240,7 @@ class ModelSpeech(object): # 语音模型类
 				# 当输入的wav文件长度过长时自动跳过该文件，转而使用下一个wav文件来运行
 				num_bias = 0
 				while(data_input.shape[0] > self.AUDIO_LENGTH):
-					self.logger.error('wave data lenghth of num %s is too long. \n A Exception raise when test Speech Model.' % ((ran_num + i) % num_data))
-# 					print('*[Error]','wave data lenghth of num',(ran_num + i) % num_data, 'is too long.','\n A Exception raise when test Speech Model.')
+					print('*[Error]','wave data lenghth of num',(ran_num + i) % num_data, 'is too long.','\n A Exception raise when test Speech Model.')
 					num_bias += 1
 					data_input, data_labels = data.GetData((ran_num + i + num_bias) % num_data)  # 从随机数开始连续向后取一定数量数据
 				# 数据格式出错处理 结束
@@ -281,32 +256,25 @@ class ModelSpeech(object): # 语音模型类
 					word_error_num += words_n # 就直接加句子本来的总字数就好了
 				
 				if(i % 10 == 0 and show_ratio == True):
-					self.logger.debug('Test Count: %s/%s'% (i, data_count))
+					print('测试进度：',i,'/',data_count)
 				
+				txt = ''
 				if(out_report == True):
-					if(i % io_step_file == 0 or i == data_count - 1):
-						txt_obj.write(txt)
-						txt = ''
-					
 					txt += str(i) + '\n'
 					txt += 'True:\t' + str(data_labels) + '\n'
 					txt += 'Pred:\t' + str(pre) + '\n'
 					txt += '\n'
-					
+					txt_obj.write(txt)
 				
 			
-			#print('*[测试结果] 语音识别 ' + str_dataset + ' 集语音单字错误率：', word_error_num / words_num * 100, '%')
-			self.logger.info('Speech Recognition %s set word error ratio: %s%%'% (str_dataset, word_error_num / words_num * 100))
-# 			print('*[Test Result] Speech Recognition ' + str_dataset + ' set word error ratio: ', word_error_num / words_num * 100, '%')
+			print('*[测试结果] 语音识别 ' + str_dataset + ' 集语音单字错误率：', word_error_num / words_num * 100, '%')
 			if(out_report == True):
-				txt += '*[测试结果] 语音识别 ' + str_dataset + ' 集语音单字错误率： ' + str(word_error_num / words_num * 100) + ' %'
+				txt = '*[测试结果] 语音识别 ' + str_dataset + ' 集语音单字错误率： ' + str(word_error_num / words_num * 100) + ' %'
 				txt_obj.write(txt)
-				txt = ''
 				txt_obj.close()
 			
 		except StopIteration:
-			self.logger.error('[Error] Model Test Error. please check data format.')
-# 			print('[Error] Model Test Error. please check data format.')
+			print('[Error] Model Test Error. please check data format.')
 	
 	def Predict(self, data_input, input_len):
 		'''
@@ -372,7 +340,7 @@ class ModelSpeech(object): # 语音模型类
 		# 获取输入特征
 		#data_input = GetMfccFeature(wavsignal, fs)
 		#t0=time.time()
-		data_input = GetFrequencyFeature3(wavsignal, fs)
+		data_input = GetFrequencyFeature2(wavsignal, fs)
 		#t1=time.time()
 		#print('time cost:',t1-t0)
 		
@@ -386,7 +354,7 @@ class ModelSpeech(object): # 语音模型类
 		r1 = self.Predict(data_input, input_length)
 		#t3=time.time()
 		#print('time cost:',t3-t2)
-		list_symbol_dic = DataSpeech.GetSymbolList() # 获取拼音列表
+		list_symbol_dic = GetSymbolList(self.datapath) # 获取拼音列表
 		
 		
 		r_str=[]
@@ -419,28 +387,44 @@ class ModelSpeech(object): # 语音模型类
 		return self._model
 
 
-if __name__=='__main__':
-    
-    #import tensorflow as tf
-    #from keras.backend.tensorflow_backend import set_session
-    #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    #进行配置，使用70%的GPU
-    #config = tf.ConfigProto()
-    #config.gpu_options.per_process_gpu_memory_fraction = 0.95
-    #config.gpu_options.allow_growth=True   #不全部占满显存, 按需分配
-    #set_session(tf.Session(config=config))
-    
-    datapath_thchs30 = "/Users/ivanguo/Downloads/dataset/thchs30-openslr"
-    datapath_stcmds = "/Users"
-    
-    ms = ModelSpeech(datapath_thchs30, datapath_stcmds)
-    
-    
-    #ms.LoadModel(modelpath + 'm251/speech_model251_e_0_step_98000.model')
-    ms.TrainModel(epoch = 50, batch_size = 16, save_step = 500)
-    #ms.TestModel(datapath, str_dataset='test', data_count = 128, out_report = True)
-    #r = ms.RecognizeSpeech_FromFile('E:\\语音数据集\\ST-CMDS-20170001_1-OS\\20170001P00241I0053.wav')
-    #r = ms.RecognizeSpeech_FromFile('E:\\语音数据集\\ST-CMDS-20170001_1-OS\\20170001P00020I0087.wav')
-    #r = ms.RecognizeSpeech_FromFile('E:\\语音数据集\\wav\\train\\A11\\A11_167.WAV')
-    #r = ms.RecognizeSpeech_FromFile('E:\\语音数据集\\wav\\test\\D4\\D4_750.wav')
-    #print('*[提示] 语音识别结果：\n',r)
+if(__name__=='__main__'):
+	
+	import tensorflow as tf
+	from keras.backend.tensorflow_backend import set_session
+	os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+	#进行配置，使用70%的GPU
+	config = tf.ConfigProto()
+	config.gpu_options.per_process_gpu_memory_fraction = 0.93
+	#config.gpu_options.allow_growth=True   #不全部占满显存, 按需分配
+	set_session(tf.Session(config=config))
+	
+	
+	datapath = ''
+	modelpath = 'model_speech'
+	
+	
+	if(not os.path.exists(modelpath)): # 判断保存模型的目录是否存在
+		os.makedirs(modelpath) # 如果不存在，就新建一个，避免之后保存模型的时候炸掉
+	
+	system_type = plat.system() # 由于不同的系统的文件路径表示不一样，需要进行判断
+	if(system_type == 'Windows'):
+		datapath = 'E:\\语音数据集'
+		modelpath = modelpath + '\\'
+	elif(system_type == 'Linux'):
+		datapath = 'dataset'
+		modelpath = modelpath + '/'
+	else:
+		print('*[Message] Unknown System\n')
+		datapath = 'dataset'
+		modelpath = modelpath + '/'
+	
+	ms = ModelSpeech(datapath)
+	
+	#ms.LoadModel(modelpath + 'm26/speech_model26_e_0_step_397000.model')
+	ms.TrainModel(datapath, epoch = 50, batch_size = 16, save_step = 500)
+	#ms.TestModel(datapath, str_dataset='test', data_count = 128, out_report = True)
+	#r = ms.RecognizeSpeech_FromFile('E:\\语音数据集\\ST-CMDS-20170001_1-OS\\20170001P00241I0053.wav')
+	#r = ms.RecognizeSpeech_FromFile('E:\\语音数据集\\ST-CMDS-20170001_1-OS\\20170001P00020I0087.wav')
+	#r = ms.RecognizeSpeech_FromFile('E:\\语音数据集\\wav\\train\\A11\\A11_167.WAV')
+	#r = ms.RecognizeSpeech_FromFile('E:\\语音数据集\\wav\\test\\D4\\D4_750.wav')
+	#print('*[提示] 语音识别结果：\n',r)

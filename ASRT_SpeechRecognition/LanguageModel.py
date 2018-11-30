@@ -238,6 +238,7 @@ if(__name__=='__main__'):
 	#str_pinyin = ['da4', 'jia1', 'hao3']
 	str_pinyin = ['kao3', 'yan2', 'ying1', 'yu3', 'ci2', 'hui4']
 	str_pinyin = ['mei2', 'mei2', 'qin1', 'yi2', 'ge4']
+	str_pinyin = ['mei2', 'mei2', 'bu4', 'xi3', 'huan1', 'chi1', 'ku3', 'gua1']
 	#r = ml.decode(str_pinyin)
 	
 	r=ml.SpeechToText(str_pinyin)

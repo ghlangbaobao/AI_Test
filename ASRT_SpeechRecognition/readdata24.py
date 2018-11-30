@@ -149,7 +149,7 @@ class DataSpeech(object):
 		data_label = np.array(feat_out)
 		return data_input, data_label
 	
-	def data_genetator(self, batch_size=32, audio_length = 1600):
+	def data_genetator_old(self, batch_size=32, audio_length = 1600):
 		'''
 		数据生成器函数，用于Keras的generator_fit训练
 		batch_size: 一次产生的数据量
@@ -181,6 +181,64 @@ class DataSpeech(object):
 			for i in range(batch_size):
 				ran_num = random.randint(0,self.DataNum - 1) # 获取一个随机数
 				data_input, data_labels = self.GetData(ran_num)  # 通过随机数取一个数据
+				#data_input, data_labels = self.GetData((ran_num + i) % self.DataNum)  # 从随机数开始连续向后取一定数量数据
+				
+				self.logger.debug("data_input shape: %s" % str(data_input.shape))
+				input_length.append(data_input.shape[0] // 8 + data_input.shape[0] % 8)
+				#print(data_input, data_labels)
+				self.logger.debug('data_input length: %s' % len(data_input))
+				
+				X[i,0:len(data_input)] = data_input
+				#print('data_labels长度:',len(data_labels))
+				#print(data_labels)
+				y[i,0:len(data_labels)] = data_labels
+				#print(i,y[i].shape)
+				#y[i] = y[i].T
+				#print(i,y[i].shape)
+				label_length.append([len(data_labels)])
+			
+			label_length = np.matrix(label_length)
+			input_length = np.array(input_length).T
+			#input_length = np.array(input_length)
+			#print('input_length:\n',input_length)
+			#X=X.reshape(batch_size, audio_length, 200, 1)
+			#print(X)
+			self.logger.debug("yield wave data, input_length: %s, label_length: %s" % (input_length, label_length))
+			yield [X, y, input_length, label_length ], labels
+	
+	def data_genetator(self, batch_size=32, audio_length = 1600):
+		'''
+		数据生成器函数，用于Keras的generator_fit训练
+		batch_size: 一次产生的数据量
+		需要再修改。。。
+		'''
+		
+		labels = []
+		for i in range(0,batch_size):
+			#input_length.append([1500])
+			labels.append([0.0])
+		
+		
+		
+		labels = np.array(labels, dtype = np.float)
+		
+		#print(input_length,len(input_length))
+		num_list = range(self.DataNum)
+		random.shuffle(num_list)
+		for data_num in num_list:
+			X = np.zeros((batch_size, audio_length, 200, 1), dtype = np.float)
+			#y = np.zeros((batch_size, 64, self.SymbolNum), dtype=np.int16)
+			y = np.zeros((batch_size, 64), dtype=np.int16)
+			
+			#generator = ImageCaptcha(width=width, height=height)
+			input_length = []
+			label_length = []
+			
+			
+			
+			for i in range(batch_size):
+# 				ran_num = random.randint(0,self.DataNum - 1) # 获取一个随机数
+				data_input, data_labels = self.GetData(data_num)  # 通过随机数取一个数据
 				#data_input, data_labels = self.GetData((ran_num + i) % self.DataNum)  # 从随机数开始连续向后取一定数量数据
 				
 				self.logger.debug("data_input shape: %s" % str(data_input.shape))

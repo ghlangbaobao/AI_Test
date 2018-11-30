@@ -125,7 +125,7 @@ def GetFrequencyFeature3(wavsignal, fs):
 	data_line = np.zeros((1, 400), dtype = np.float)
 	
 	for i in range(0, range0_end):
-		p_start = i * 160
+		p_start = i * fs / 100
 		p_end = p_start + 400
 		
 		data_line = wav_arr[0, p_start:p_end]
