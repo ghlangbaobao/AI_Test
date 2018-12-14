@@ -42,7 +42,7 @@ class Feeder:
 		#Load metadata
 		self._data_dir = os.path.dirname(metadata_filename)
 		with open(metadata_filename, 'r') as f:
-			self._metadata = [line.strip().split('|') for line in f]
+			self._metadata = [line.strip().split('|') for line in f if line.strip()]
 
 		#Train test split
 		if hparams.wavenet_test_size is None:

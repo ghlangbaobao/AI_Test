@@ -87,6 +87,12 @@ def main():
 			raise ValueError('I don\'t recommend running WaveNet on entire dataset.. The world might end before the synthesis :) (only eval allowed)')
 
 	taco_checkpoint, wave_checkpoint, hparams = prepare_run(args)
+	if os.path.exists("/content/drive/AI_Test"):
+		taco_checkpoint = os.path.join("/content/drive/AI_Test", taco_checkpoint)
+		wave_checkpoint = os.path.join("/content/drive/AI_Test", wave_checkpoint)
+		os.makedirs(taco_checkpoint, exist_ok=True)
+		os.makedirs(wave_checkpoint, exist_ok=True)
+	
 	sentences = get_sentences(args)
 
 	if args.model == 'Tacotron':

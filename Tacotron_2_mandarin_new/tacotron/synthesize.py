@@ -94,7 +94,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	synth.load(checkpoint_path, hparams, gta=GTA)
 # 	with open(metadata_filename, encoding='utf-8') as f:
 	with open(metadata_filename) as f:
-		metadata = [line.strip().split('|') for line in f]
+		metadata = [line.strip().split('|') for line in f if line.strip()]
 		frame_shift_ms = hparams.hop_size / hparams.sample_rate
 		hours = sum([int(x[4]) for x in metadata]) * frame_shift_ms / (3600)
 		log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(metadata), hours))
