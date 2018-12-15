@@ -141,7 +141,8 @@ def main():
 	log_dir, hparams = prepare_run(args)
 	
 	if os.path.exists("/content/drive/AI_Test"):
-		log_dir = os.path.join("/content/drive/AI_Test/log-%s" % args.model)
+		run_name = args.name or args.model
+		log_dir = os.path.join("/content/drive/AI_Test/logs-%s" % run_name)
 		os.makedirs(log_dir, exist_ok=True)
 	
 	if args.model == 'Tacotron':
